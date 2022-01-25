@@ -6,3 +6,4 @@ __pycache__
 .env.db
 static
 db.sqlite3
+proxies.txt
