@@ -1,0 +1,73 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:13
+    container_name: 'blockchain-scan-database'
+    restart: always
+    ports:
+      - 32700:5432
+    volumes:
+      - .data:/var/lib/postgresql/data
+    env_file:
+      - .env.db
+  api:
+    build: .
+    container_name: 'blockchain-scan-api'
+    restart: always
+    entrypoint: /app/entrypoint.sh
+    volumes:
+      - ./static:/app/static
+    env_file:
+      - .env
+    depends_on:
+      - db
+  nginx:
+    build: ./nginx
+    container_name: 'blockchain-scan-nginx'
+    volumes:
+      - ./static:/static
+    ports:
+      - "8001:80"
+    depends_on:
+      - api
+  bot:
+    build: .
+    container_name: 'blockchain-scan-bot'
+    restart: always
+    command: python manage.py telegram_bot_start
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - nginx
+  redis:
+    image: redis
+    restart: always
+    container_name: 'blockchain-scan-redis'
+  celery:
+    build: .
+    restart: always
+    container_name: 'blockchain-scan-celery-worker'
+    command: celery -A config worker --loglevel=info
+    links:
+      - redis
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - redis
+  beat:
+    build: .
+    restart: always
+    container_name: 'blockchain-scan-celery-beat'
+    command: celery -A config beat --loglevel=info
+    links:
+      - redis
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - redis
+networks:
+  default:
+    name: blockchain-scan
